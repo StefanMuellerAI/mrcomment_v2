@@ -1,0 +1,112 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Okay, here is a list of the relevant files and directories for customizing the Open SaaS template, along with their descriptions:
+
+**General Project Structure:**
+
+*   **`template/`**: This is the main directory containing the actual SaaS template code you'll modify.
+    *   **`app/`**: Contains the core full-stack web application built with Wasp (React, Node.js, Prisma). *This is where most of your application-specific code will live.*
+    *   **`blog/`**: Contains the documentation and blog site built with Astro Starlight. Customize or remove this if you don't need a blog/docs section.
+    *   **`e2e-tests/`**: Contains end-to-end tests using Playwright for the web application. Modify these to match your application's specific features and flows.
+
+---
+
+**Inside `template/app/` (The Core Web Application):**
+
+*   **`main.wasp`**:
+    *   **Description**: The central Wasp configuration file. This is crucial for defining the overall structure of your application.
+    *   **Customization**: Modify this to change the app name, title, head tags (meta descriptions, keywords, OG tags for SEO), authentication methods (enable/disable email, Google, GitHub, Discord), define database entities, declare API routes, server actions/queries, background jobs, and configure the email sender.
+
+*   **`schema.prisma`**:
+    *   **Description**: Defines your database schema using Prisma. Directly linked to the `app.db` section in `main.wasp`.
+    *   **Customization**: Add, remove, or modify database models (entities) and their fields (e.g., add custom user profile fields, define models specific to your SaaS features). *Remember to run `wasp db migrate-dev` after changes.*
+
+*   **`package.json` / `package-lock.json`**:
+    *   **Description**: Standard Node.js files for managing project dependencies (client and server).
+    *   **Customization**: Add or update npm packages needed for your application logic (e.g., new UI libraries, backend utilities).
+
+*   **`.env.server.example` / `.env.client.example`**:
+    *   **Description**: Example files showing required environment variables.
+    *   **Customization**: **You MUST copy these to `.env.server` and `.env.client` respectively.** Fill in your actual API keys (Stripe, OpenAI, AWS S3, Auth providers, Email Sender, Analytics), database URLs (for production), and other configuration secrets here. Delete variables for services you don't use.
+
+*   **`public/`**:
+    *   **Description**: Directory for static assets served directly by the webserver.
+    *   **Customization**: Replace `favicon.ico`, `logo.webp`, `open-saas-banner.webp` (used for social sharing previews), and add any other public assets like images or fonts.
+
+*   **`src/`**: The primary directory for your application's source code.
+    *   **`client/`**: Contains client-side React code.
+        *   `App.tsx`: The root React component. Good place for global context providers or layout adjustments.
+        *   `Main.css`: Global CSS styles.
+        *   `components/`: Shared React components used across different features (e.g., NavBar, CookieConsentBanner). Customize UI elements here.
+        *   `static/`: Static assets imported directly into your client code (e.g., specific logos, images used within components).
+        *   `hooks/`: Custom React hooks shared across the client-side.
+    *   **`server/`**: Contains server-side Node.js code.
+        *   `scripts/dbSeeds.ts`: Logic for seeding the database (run with `wasp db seed`). Customize to seed your specific data models or modify mock user generation.
+        *   `utils.ts`: Shared server-side utility functions.
+        *   `validation.ts`: Shared server-side validation logic.
+    *   **`shared/`**: Code shared between the client and server (e.g., `common.ts` for URLs, `utils.ts` for shared helpers).
+    *   **Feature Directories (e.g., `auth/`, `payment/`, `demo-ai-app/`, `file-upload/`, `user/`, `admin/`, `landing-page/`, `messages/`)**:
+        *   **Description**: These directories follow a vertical slicing approach, containing both client (React) and server (Node.js) code related to a specific feature.
+        *   **Customization**:
+            *   Modify the components and logic within these directories to change how features behave (e.g., customize auth forms in `auth/`, change payment logic in `payment/`, alter the admin dashboard in `admin/`).
+            *   Remove directories for features you don't need (e.g., delete `demo-ai-app/` if you're not building an AI app).
+            *   Add new directories for your own application-specific features.
+    *   **`landing-page/`**: Specific components (`Hero.tsx`, `Features.tsx`, etc.) and content (`contentSections.ts`) for the main landing page. Customize heavily for your product's marketing.
+    *   **`payment/`**: Contains logic for Stripe/Lemon Squeezy integration, including checkout, webhooks, pricing page, plans definition (`plans.ts`), and payment processor selection (`paymentProcessor.ts`). **Crucial for setting up monetization.**
+
+*   **`tailwind.config.cjs` / `postcss.config.cjs`**:
+    *   **Description**: Configuration files for Tailwind CSS and PostCSS.
+    *   **Customization**: Modify theme colors, fonts, spacing, add plugins, etc., to change the overall look and feel of the application UI.
+
+---
+
+**Inside `template/blog/` (The Documentation/Blog Site):**
+
+*   **`astro.config.mjs`**:
+    *   **Description**: Main configuration file for the Astro site, including Starlight and Tailwind integrations.
+    *   **Customization**: Change site title, logo, social links, sidebar navigation structure, enable/disable integrations, add custom head tags, configure blog settings (title, authors).
+
+*   **`src/content/docs/`**:
+    *   **Description**: Contains all the Markdown (`.md`) or MDX (`.mdx`) files for your documentation and blog posts.
+    *   **Customization**: Add, edit, or delete files here to create your content. The directory structure here dictates the URL structure. Edit frontmatter (title, date, tags, authors) within these files.
+
+*   **`src/content/config.ts`**:
+    *   **Description**: Defines the schema (expected frontmatter properties) for your content collections (docs, blog posts).
+    *   **Customization**: Modify if you add custom frontmatter fields to your Markdown/MDX files.
+
+*   **`src/components/`**:
+    *   **Description**: Custom Astro components used within the Starlight site (e.g., custom header, image/video handling).
+    *   **Customization**: Modify these components to change specific UI elements or functionalities beyond standard Starlight options.
+
+*   **`public/`**:
+    *   **Description**: Static assets specifically for the blog/docs site (e.g., author images, specific banner images).
+    *   **Customization**: Add or replace assets used by the blog/docs site. `banner-images/` is particularly relevant for blog post cover/social images.
+
+*   **`tailwind.config.js` / `postcss.config.cjs`**:
+    *   **Description**: Styling configuration specifically for the blog/docs site.
+    *   **Customization**: Adjust the look and feel of the blog/docs independently from the main app.
+
+*   **`package.json` / `package-lock.json`**:
+    *   **Description**: Dependency management for the blog/docs site.
+    *   **Customization**: Add Astro integrations or other dependencies needed for the blog.
+
+---
+
+**Inside `template/e2e-tests/` (End-to-End Tests):**
+
+*   **`tests/`**:
+    *   **Description**: Contains the actual Playwright test files (`.spec.ts`).
+    *   **Customization**: Add new test files or modify existing ones to cover your application's specific user flows and features.
+
+*   **`playwright.config.ts`**:
+    *   **Description**: Configuration for the Playwright test runner.
+    *   **Customization**: Adjust browser settings, timeouts, base URL (if needed), or other test runner options.
+
+*   **`utils.ts`**:
+    *   **Description**: Utility functions used within the tests (e.g., helper functions for signing up or logging in users).
+    *   **Customization**: Modify these if you change the core authentication flow or add other common actions needed across multiple tests.
+
+This list covers the primary areas you'll likely interact with when customizing the Open SaaS template for your own project. Remember to consult the relevant `README.md` files within these directories for more specific instructions.
