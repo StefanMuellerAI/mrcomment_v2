@@ -89,7 +89,7 @@ export const generateComments: GenerateComments<GenerateCommentsInput, any> = as
     const styleAnalysis = customer.style?.styleAnalysis || "a general, engaging, and professional tone appropriate for LinkedIn.";
     
     const openAIInputs = [
-        { role: "system", content: [{ type: "input_text", text: developerPromptText }] },
+        { role: "developer", content: [{ type: "input_text", text: developerPromptText }] },
         { role: "user", content: [ {type: "input_text", text: `LinkedIn Post to comment on: \"${linkedInPostText}\". Please use the following style for the comments: \"${styleAnalysis}\".` } ]}
     ];
 
@@ -118,11 +118,11 @@ export const generateComments: GenerateComments<GenerateCommentsInput, any> = as
     // console.log('[generateComments] Attempting OpenAI API call.'); // Keep commented for now
     try {
         const response = await (openai as any).responses.create({
-            model: "gpt-4.1", 
+            model: "o4-mini", 
             input: openAIInputs,
             text: { format: { type: "json_schema", name: "comments_with_sentiment", schema: commentsJSONSchema, strict: true } },
             temperature: 1,
-            max_output_tokens: 2048,
+            max_output_tokens: 15000,
             top_p: 1,
             // store: true, // REMOVED this line as it might be an invalid parameter
         });

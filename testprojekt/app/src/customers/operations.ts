@@ -41,7 +41,7 @@ async function generateAndSaveStyleAnalysis(
             model: "gpt-4.1",
             messages: [{ role: "user", content: promptContent }],
             temperature: 0.5,
-            max_tokens: 150,
+            max_tokens: 15000,
         })
 
         const analysis = completion.choices[0]?.message?.content?.trim()

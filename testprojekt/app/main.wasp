@@ -7,15 +7,15 @@ app OpenSaaS {
 
   head: [
     "<meta charset='utf-8' />",
-    "<meta name='description' content='Your apps main description and features.' />",
-    "<meta name='author' content='Your (App) Name' />",
+    "<meta name='description' content='Erstelle mit Leichtigkeit LinkedIn Kommentare und Posts!' />",
+    "<meta name='author' content='MrComment.de' />",
     "<meta name='keywords' content='saas, solution, product, app, service' />",
     
     "<meta property='og:type' content='website' />",
-    "<meta property='og:title' content='Your Open SaaS App' />",
-    "<meta property='og:site_name' content='Your Open SaaS App' />",
-    "<meta property='og:url' content='https://your-saas-app.com' />",
-    "<meta property='og:description' content='Your apps main description and features.' />",
+    "<meta property='og:title' content='MrComment' />",
+    "<meta property='og:site_name' content='MrComment' />",
+    "<meta property='og:url' content='https://mrcomment.de' />",
+    "<meta property='og:description' content='Erstelle mit Leichtigkeit LinkedIn Kommentare und Posts!' />",
     "<meta property='og:image' content='https://your-saas-app.com/public-banner.webp' />",
     "<meta name='twitter:image' content='https://your-saas-app.com/public-banner.webp' />",
     "<meta name='twitter:image:width' content='800' />",
@@ -37,7 +37,7 @@ app OpenSaaS {
       //   (RequestPasswordReset(Route|Page), PasswordReset(Route|Page), EmailVerification(Route|Page))
       email: {
         fromField: {
-          name: "Open SaaS App",
+          name: "Mr.Comment",
           email: "donotreply@mrcomment.de"
         },
         emailVerification: {
@@ -88,9 +88,9 @@ app OpenSaaS {
     //   Once you are ready for production, switch to e.g. "SendGrid" or "Mailgun" providers. Check out https://docs.opensaas.sh/guides/email-sending/ .
     provider: SMTP,
     defaultFrom: {
-      name: "Open SaaS App",
+      name: "Mr.Comment",
       // When using a real provider, e.g. SendGrid, you must use the same email address that you configured your account to send out emails with!
-      email: "donotreply"
+      email: "donotreply@mrcomment.de"
     },
   },
 }
@@ -411,8 +411,8 @@ action generateLinkedInPostWithAI {
 
 // ++ Archive Page Query ++
 query getAllLinkedInPostsForUser {
-  fn: import { getAllLinkedInPostsForUser } from "@src/archive/operations.js",
-  entities: [User, LinkedInPost, Customer]
+  fn: import { getAllLinkedInPostsForUser } from "@src/archive/operations.ts",
+  entities: [User, LinkedInPost, Customer, Schedule]
 }
 // -- Archive Page Query --
 
@@ -423,6 +423,14 @@ page ArchivePage {
   component: import ArchivePage from "@src/archive/ArchivePage"
 }
 // -- Archive Page Route and Definition --
+
+// ++ Schedule Page Route and Definition ++
+route ScheduleRoute { path: "/schedule", to: SchedulePage }
+page SchedulePage {
+  authRequired: true,
+  component: import SchedulePage from "@src/schedule/SchedulePage" // You will need to create this file
+}
+// -- Schedule Page Route and Definition --
 
 query getAllCustomers {
   fn: import { getAllCustomers } from "@src/customers/operations",
@@ -470,5 +478,63 @@ action generateComments {
 query getAllCustomersForSelection {
   fn: import { getAllCustomersForSelection } from "@src/comments/operations",
   entities: [User, Customer]
+}
+//#endregion
+
+//#region Scheduling
+// Action to create or update a schedule for a LinkedIn post
+action setPostSchedule {
+  fn: import { setPostSchedule } from "@src/schedule/operations.js", // You will need to create this file and function
+  entities: [User, LinkedInPost, Schedule]
+}
+
+// Action to delete a schedule for a LinkedIn post
+action deletePostSchedule {
+  fn: import { deletePostSchedule } from "@src/schedule/operations.js", // You will need to create this file and function
+  entities: [User, LinkedInPost, Schedule]
+}
+
+// Query to get the schedule for a specific LinkedIn post
+query getPostSchedule {
+  fn: import { getPostSchedule } from "@src/schedule/operations.js", // You will need to create this file and function
+  entities: [User, LinkedInPost, Schedule]
+}
+
+// Query to get all scheduled posts for a specific customer (useful for a list view)
+query getScheduledPostsForCustomer {
+  fn: import { getScheduledPostsForCustomer } from "@src/schedule/operations.js", // You will need to create this file and function
+  entities: [User, Customer, LinkedInPost, Schedule]
+}
+
+// Query to get all schedules within a specific date range (useful for a calendar view)
+query getSchedulesByDateRange {
+  fn: import { getSchedulesByDateRange } from "@src/schedule/operations.js",
+  entities: [User, LinkedInPost, Schedule]
+}
+
+// Optional: A Wasp Job to handle sending reminders
+job sendScheduledReminders {
+  executor: PgBoss, // Or another executor if you prefer
+  perform: {
+    fn: import { sendScheduledReminders } from "@src/schedule/jobs.js" // You will need to create this file and function
+  },
+  schedule: {
+    // Example: Run every 5 minutes
+    cron: "*/5 * * * *"
+  },
+  entities: [User, LinkedInPost, Schedule] // Ensure User is included for email addresses
+}
+
+// New Job to mark posts as posted
+job markPostsAsPosted {
+  executor: PgBoss,
+  perform: {
+    fn: import { markScheduledPostsAsPosted } from "@src/schedule/jobs.js"
+  },
+  schedule: {
+    // Run every minute to ensure timely updates
+    cron: "* * * * *"
+  },
+  entities: [Schedule, LinkedInPost] // LinkedInPost might not be strictly needed if not directly used in job logic after linking
 }
 //#endregion

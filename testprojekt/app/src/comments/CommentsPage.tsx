@@ -4,6 +4,7 @@ import type { Customer } from 'wasp/entities';
 import { CgSpinner } from 'react-icons/cg';
 import { IoCopyOutline } from 'react-icons/io5';
 import { cn } from '../client/cn';
+import { FaTrash } from 'react-icons/fa';
 
 // Updated interface for individual comments from the new API response
 interface GeneratedComment {
@@ -132,18 +133,34 @@ const CommentsPage: React.FC = () => {
             <label htmlFor='linkedInPost' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>
               Paste LinkedIn Post Here (min. 50 chars)
             </label>
-            <textarea
-              id='linkedInPost'
-              rows={12} // Increased rows for better space in two-column layout
-              value={linkedInPost}
-              onChange={(e) => setLinkedInPost(e.target.value)}
-              placeholder='Paste the full text of the LinkedIn post...'
-              required
-              minLength={50}
-              className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white'
-            />
+            <div className="relative">
+              <textarea
+                id='linkedInPost'
+                rows={12}
+                value={linkedInPost}
+                onChange={(e) => setLinkedInPost(e.target.value)}
+                placeholder='Paste the full text of the LinkedIn post...'
+                required
+                minLength={50}
+                className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white pr-10'
+              />
+            </div>
           </div>
           
+          {/* ADD TRASH BUTTON HERE */}
+          {linkedInPost && (
+            <div className="flex justify-end mb-2"> {/* Container for right alignment and margin */}
+              <button
+                type="button"
+                aria-label="Clear LinkedIn Post"
+                className="p-1.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-500 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => setLinkedInPost('')}
+              >
+                <FaTrash size={16} />
+              </button>
+            </div>
+          )}
+
           <button
             onClick={handleGenerateClick}
             disabled={isLoading || linkedInPost.length < 50 || !selectedCustomerId}

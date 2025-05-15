@@ -184,4 +184,21 @@ model LinkedInPost {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  schedule Schedule?
+}
+
+model Schedule {
+  linkedInPostId String @id @unique
+  linkedInPost   LinkedInPost @relation(fields: [linkedInPostId], references: [id], onDelete: Cascade)
+
+  postingDate DateTime
+  reminderInMinutes Int?
+  isReminderSent    Boolean  @default(false)
+  isPosted          Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postingDate])
 }

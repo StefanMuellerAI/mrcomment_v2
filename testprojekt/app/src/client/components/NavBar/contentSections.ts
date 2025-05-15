@@ -4,7 +4,8 @@ import {
   IoPeopleOutline, 
   IoChatbubblesOutline, 
   IoNewspaperOutline, 
-  IoArchiveOutline 
+  IoArchiveOutline,
+  IoCalendarOutline
 } from 'react-icons/io5';
 // Removed unused imports
 // import { BlogUrl, DocsUrl } from '../../../shared/common';
@@ -25,6 +26,7 @@ export const appNavigationItems: SidebarNavigationItem[] = [
   { name: 'Customers', to: routes.CustomersRoute.to, icon: IoPeopleOutline },
   { name: 'Comments', to: routes.CommentsRoute.to, icon: IoChatbubblesOutline },
   { name: 'Posts', to: routes.PostsRoute.to, icon: IoNewspaperOutline },
+  { name: 'Schedule', to: routes.ScheduleRoute.to, icon: IoCalendarOutline },
   { name: 'Archive', to: routes.ArchiveRoute.to, icon: IoArchiveOutline },
   // Account and old Pricing links are already removed or were never here for appNavigationItems
 ];
