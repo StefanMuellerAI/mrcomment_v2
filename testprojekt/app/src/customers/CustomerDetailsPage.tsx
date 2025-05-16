@@ -5,6 +5,7 @@ import type { Customer, Style, Persona } from 'wasp/entities';
 import { CgSpinner } from 'react-icons/cg';
 import { TiDelete } from 'react-icons/ti';
 import { customerPlans, getPlanById, CustomerPlan } from './plans';
+import LinkedInIntegrationCard from './LinkedInIntegrationCard';
 
 // Helper to format date for input type='date'
 const formatDateForInput = (date: Date | string | null | undefined): string => {
@@ -198,7 +199,7 @@ const CustomerDetailsPage: React.FC = () => {
           </fieldset>
 
           <fieldset className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-            <legend className="text-lg font-medium text-gray-900 dark:text-white mb-3">Style Profile</legend>
+            <legend className="text-lg font-medium text-gray-900 dark:text-white">Style Profile</legend>
             <div>
               <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>LinkedIn Examples (min. 3)</label>
               {linkedinExampleInputs.map((input, index) => (
@@ -227,7 +228,7 @@ const CustomerDetailsPage: React.FC = () => {
           </fieldset>
 
           <fieldset className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-            <legend className="text-lg font-medium text-gray-900 dark:text-white mb-3">Persona Profile</legend>
+            <legend className="text-lg font-medium text-gray-900 dark:text-white">Persona Profile</legend>
             <div><label htmlFor='birthday' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>Birthday</label><input type='date' name='birthday' id='birthday' value={birthday} onChange={(e) => setBirthday(e.target.value)} className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white' /></div>
             <div><label htmlFor='jobDescription' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>Job Description</label><textarea name='jobDescription' id='jobDescription' rows={3} value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white'></textarea></div>
             <div><label htmlFor='fieldOfWork' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>Field of Work</label><input type='text' name='fieldOfWork' id='fieldOfWork' value={fieldOfWork} onChange={(e) => setFieldOfWork(e.target.value)} className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white' /></div>
@@ -242,42 +243,47 @@ const CustomerDetailsPage: React.FC = () => {
         </form>
 
         {/* Right Column: Subscription Plan Management */}
-        <div className="md:col-span-1 space-y-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md self-start">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Subscription Plan</h2>
-          {currentPlanDetails ? (
-            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-md">
-              <h3 className="font-semibold text-blue-800 dark:text-blue-200">Current Plan: {currentPlanDetails.name}</h3>
-              {currentPlanDetails.price && <p className="text-sm text-blue-600 dark:text-blue-300">{currentPlanDetails.price}</p>}
-              {currentPlanDetails.dailyCommentLimit && <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">Daily Comment Limit: {currentPlanDetails.dailyCommentLimit}</p>}
-              {currentPlanDetails.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{currentPlanDetails.description}</p>}
-            </div>
-          ) : (
-            <p className="text-gray-500 dark:text-gray-400 mb-4">No active plan or plan details unavailable.</p>
-          )}
-          
-          <div>
-            <label htmlFor="plan-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Change Plan:</label>
-            <select 
-              id="plan-select"
-              value={selectedPlanId}
-              onChange={(e) => setSelectedPlanId(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white"
-            >
-              {customerPlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name} ({plan.price}) - Daily Comments: {plan.dailyCommentLimit}
-                </option>
-              ))}
-            </select>
+        <div className="md:col-span-1 space-y-6">
+          {/* Subscription Plan Management Card */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md self-start">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Subscription Plan</h2>
+            {currentPlanDetails ? (
+              <div className='space-y-3'>
+                <div className='p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md border border-blue-200 dark:border-blue-700'>
+                  <p className='font-semibold text-blue-800 dark:text-blue-300'>Current Plan: {currentPlanDetails.name}</p>
+                  <p className='text-sm text-blue-600 dark:text-blue-400'>{currentPlanDetails.price}</p>
+                  <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>{currentPlanDetails.description}</p>
+                </div>
+                <div>
+                  <label htmlFor='planSelect' className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'>Change Plan:</label>
+                  <select 
+                    id='planSelect'
+                    value={selectedPlanId}
+                    onChange={(e) => setSelectedPlanId(e.target.value)}
+                    className='mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm dark:bg-gray-700 dark:text-white'
+                  >
+                    {customerPlans.map(plan => (
+                      <option key={plan.id} value={plan.id}>{plan.name} ({plan.price})</option>
+                    ))}
+                  </select>
+                </div>
+                <button 
+                  onClick={handlePlanChange}
+                  disabled={isUpdatingPlan || selectedPlanId === customer.subscriptionPlan}
+                  className='w-full mt-2 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50'
+                >
+                  {isUpdatingPlan ? <CgSpinner className="animate-spin mr-2"/> : 'Update Plan'}
+                </button>
+              </div>
+            ) : (
+              <p className='text-sm text-gray-500 dark:text-gray-400'>No active subscription plan information available.</p>
+            )}
           </div>
-          <button 
-            onClick={handlePlanChange} 
-            disabled={isUpdatingPlan || selectedPlanId === customer.subscriptionPlan}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-          >
-            {isUpdatingPlan ? <CgSpinner className="animate-spin mr-2" /> : 'Update Plan'}
-          </button>
-          {/* Future: Link to payment processor if plan change requires payment */}
+
+          {/* LinkedIn Integration Card - Conditionally Rendered */}
+          {customer.subscriptionPlan === 'premium_tier' && (
+            <LinkedInIntegrationCard customerId={customer.id} />
+          )}
         </div>
       </div>
     </div>

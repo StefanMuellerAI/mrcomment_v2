@@ -1,73 +1,49 @@
 import { prisma } from 'wasp/server';
 import type { User, LinkedInPost, Schedule } from 'wasp/entities';
-import type { SendScheduledReminders } from 'wasp/server/jobs'; // Wasp type for the job
-import { getPostReminderEmailContent } from './emails'; // Email content function
-import { type EmailSender } from 'wasp/server/email'; // Wasp < 1.0 often exposes emailSender via this type
+import type { SendScheduledReminders } from 'wasp/server/jobs';
+import { getPostReminderEmailContent } from './emails';
+import { type EmailSender } from 'wasp/server/email';
+import { publishPostToLinkedIn } from '../server/linkedinIntegration';
 
-// Define JobArgs as an empty object type that satisfies JSONObject for Wasp
-// If the job truly takes no args, Record<string, never> is a good fit.
-// Or, ensure it aligns with how Wasp expects cron job args (often implicitly an empty object).
-interface JobArgs extends Record<string, never> { 
-  // No specific arguments for this cron job
-}
+interface JobArgs extends Record<string, never> { }
 
-// Type for the new job that will mark posts as posted
-// It doesn't take specific arguments from the cron definition and returns void
 type MarkScheduledPostsAsPostedJob = (args: JobArgs, context: { prisma: typeof prisma }) => Promise<void>;
 
+// Die sendScheduledReminders Funktion bleibt hier unverändert...
 export const sendScheduledReminders: SendScheduledReminders<JobArgs, void> = async (args, context) => {
   console.log('[Job] sendScheduledReminders started at', new Date().toISOString());
-
   const now = new Date();
-
-  // Find schedules where reminder time has passed but post time hasn't, and reminder not sent
   const dueSchedules = await prisma.schedule.findMany({
     where: {
       isReminderSent: false,
-      reminderInMinutes: { not: null }, // Reminder must be set
-      postingDate: { gt: now },        // Post must be in the future
-      // Reminder time check is done in the loop below
+      reminderInMinutes: { not: null },
+      postingDate: { gt: now },
     },
     include: {
       linkedInPost: {
-        include: {
-          user: true, 
-          customer: true 
-        },
+        include: { user: true, customer: true },
       },
     },
   });
-
   console.log(`[Job] Found ${dueSchedules.length} potentially due schedules to check for reminders.`);
   let remindersSentCount = 0;
-
   const emailSender = (context as any).emailSender as EmailSender | undefined;
-  
   if (!emailSender) {
-    // Log a warning instead of an error, as the job might run in an environment
-    // where email sending is not configured, but other functionalities (if any added later)
-    // of this job or other jobs should not be blocked.
     console.warn("[Job] Email sender not found in context for sendScheduledReminders. Skipping reminder sending part. Ensure emailSender is configured in main.wasp if reminders are needed.");
-    // If there were other tasks for this job besides sending emails, they could continue here.
-    // For now, if no emailSender, this job effectively does nothing more.
   } else {
     for (const schedule of dueSchedules) {
       if (!schedule.reminderInMinutes || !schedule.linkedInPost?.user?.email) {
         console.warn(`[Job] Skipping reminder for schedule ${schedule.linkedInPostId} due to missing reminder minutes, user, or email.`);
         continue;
       }
-
       const reminderTime = new Date(schedule.postingDate.getTime() - schedule.reminderInMinutes * 60000);
-
       if (reminderTime <= now) {
         console.log(`[Job] Processing reminder for post ${schedule.linkedInPost.id} for user ${schedule.linkedInPost.user.email}`);
-        
         const emailContent = getPostReminderEmailContent({
           user: schedule.linkedInPost.user,
           post: schedule.linkedInPost,
           schedule: schedule,
         });
-
         try {
           await emailSender.send({
             to: schedule.linkedInPost.user.email,
@@ -75,7 +51,6 @@ export const sendScheduledReminders: SendScheduledReminders<JobArgs, void> = asy
             html: emailContent.html,
             text: emailContent.text,
           });
-
           await prisma.schedule.update({
             where: { linkedInPostId: schedule.linkedInPostId },
             data: { isReminderSent: true },
@@ -91,37 +66,80 @@ export const sendScheduledReminders: SendScheduledReminders<JobArgs, void> = asy
   console.log(`[Job] sendScheduledReminders finished at ${new Date().toISOString()}. ${remindersSentCount} reminders sent.`);
 };
 
-// New Job: Mark Scheduled Posts as Posted
+// === Beginn der markScheduledPostsAsPosted Funktion ===
 export const markScheduledPostsAsPosted: MarkScheduledPostsAsPostedJob = async (args, context) => {
-  console.log('[Job] markScheduledPostsAsPosted started at', new Date().toISOString());
-  const now = new Date();
+  console.log('!!! [Job] markScheduledPostsAsPosted FUNCTION ENTERED !!!', new Date().toISOString());
 
-  const duePostsToMarkPosted = await context.prisma.schedule.findMany({
+  const jobStartTime = new Date();
+  console.log(`[Job] markScheduledPostsAsPosted jobStartTime: ${jobStartTime.toISOString()}`);
+
+  const currentPrismaClient = context.prisma;
+
+  try {
+    const allPendingSchedules = await currentPrismaClient.schedule.findMany({
+      where: { isPosted: false },
+      include: { linkedInPost: true },
+    });
+
+    if (allPendingSchedules.length > 0) {
+      console.log(`[Job] Found ${allPendingSchedules.length} total schedules with isPosted:false (pre-filter).`);
+      allPendingSchedules.forEach(s => {
+        console.log(`[Job] Pre-filter check: DB Post ID ${s.linkedInPostId}, PostingDate (DB): ${s.postingDate.toISOString()}, isPosted: ${s.isPosted}`);
+      });
+    } else {
+      console.log('[Job] No schedules found with isPosted:false (pre-filter).');
+    }
+  } catch (dbError: any) {
+    console.error('[Job] Error querying allPendingSchedules:', dbError.message, dbError.stack);
+    console.log('!!! [Job] markScheduledPostsAsPosted FUNCTION FINISHING due to error in allPendingSchedules query !!!', new Date().toISOString());
+    return;
+  }
+
+  const duePostsToMarkPosted = await currentPrismaClient.schedule.findMany({
     where: {
       isPosted: false,
-      postingDate: { lte: now }, // Posting date is now or in the past
+      postingDate: { lte: jobStartTime },
     },
+    include: {
+      linkedInPost: true,
+    }
   });
 
   if (duePostsToMarkPosted.length > 0) {
-    console.log(`[Job] Found ${duePostsToMarkPosted.length} posts to mark as posted.`);
-    let postsMarkedAsPostedCount = 0;
+    console.log(`[Job] Found ${duePostsToMarkPosted.length} posts due for publishing (post-filter).`);
+    let postsSuccessfullyPublishedCount = 0;
 
     for (const schedule of duePostsToMarkPosted) {
+      if (!schedule.linkedInPost) {
+        console.error(`[Job] Skipping schedule ${schedule.linkedInPostId} because linkedInPost data is missing for due post.`);
+        continue;
+      }
       try {
-        await context.prisma.schedule.update({
+        console.log(`[Job] Attempting to publish LinkedIn post with DB ID: ${schedule.linkedInPost.id} (Scheduled for: ${schedule.postingDate.toISOString()})`);
+        
+        const contextForPublish = { prisma: currentPrismaClient };
+
+        await publishPostToLinkedIn(
+          { linkedInPostIdDb: schedule.linkedInPost.id },
+          contextForPublish
+        );
+
+        console.log(`[Job] Successfully published post ${schedule.linkedInPost.id} to LinkedIn.`);
+        await currentPrismaClient.schedule.update({
           where: { linkedInPostId: schedule.linkedInPostId },
           data: { isPosted: true },
         });
-        postsMarkedAsPostedCount++;
-        console.log(`[Job] Marked post ${schedule.linkedInPostId} as posted.`);
+        postsSuccessfullyPublishedCount++;
+
       } catch (error: any) {
-        console.error(`[Job] Failed to mark post ${schedule.linkedInPostId} as posted:`, error.message);
+        console.error(`[Job] Failed to publish post ${schedule.linkedInPost.id} to LinkedIn: ${error.message}`, error.stack);
       }
     }
-    console.log(`[Job] Marking posts as posted finished. ${postsMarkedAsPostedCount} posts marked.`);
+    console.log(`[Job] Publishing attempts finished. ${postsSuccessfullyPublishedCount} posts successfully published and marked as posted.`);
   } else {
-    console.log('[Job] No posts due to be marked as posted at this time.');
+    console.log('[Job] No posts due to be published at this time (post-filter).');
   }
-  console.log(`[Job] markScheduledPostsAsPosted finished at ${new Date().toISOString()}.`);
-}; 
+
+  console.log('!!! [Job] markScheduledPostsAsPosted FUNCTION FINISHING (all logic re-enabled) !!!', new Date().toISOString());
+};
+// === Ende der markScheduledPostsAsPosted Funktion ===

@@ -181,6 +181,7 @@ const SchedulePage: React.FC = () => {
                             <div>
                               <span className='font-semibold'>{new Date(scheduleItem.postingDate).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: false})}</span> - 
                               {scheduleItem.linkedInPost.hook.substring(0,30)}{scheduleItem.linkedInPost.hook.length > 30 ? '...' : ''}
+                              <span className='text-gray-500 dark:text-gray-400 ml-1'>({scheduleItem.linkedInPost.customer.name})</span>
                             </div>
                             {scheduleItem.reminderInMinutes && (
                               <div className='text-[0.65rem] text-gray-600 dark:text-gray-400 italic'>
@@ -236,8 +237,10 @@ const SchedulePage: React.FC = () => {
             >
               <option value="">-- Select Customer --</option>
               {isLoadingCustomers && <option disabled>Loading customers...</option>}
-              {customers?.map(customer => (
-                <option key={customer.id} value={customer.id}>{customer.name}</option>
+              {customers
+                ?.filter(customer => customer.subscriptionPlan === 'premium_tier')
+                .map(customer => (
+                  <option key={customer.id} value={customer.id}>{customer.name}</option>
               ))}
             </select>
           </div>

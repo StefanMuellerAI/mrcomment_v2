@@ -15,6 +15,7 @@
     "clsx": "^2.1.0",
     "emoji-picker-react": "^4.12.2",
     "headlessui": "^0.0.0",
+    "linkedin-api-client": "^0.3.0",
     "node-fetch": "3.3.0",
     "openai": "^4.55.3",
     "prettier": "3.1.1",

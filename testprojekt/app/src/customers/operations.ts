@@ -1,5 +1,5 @@
 import { HttpError } from 'wasp/server'
-import type { Prisma, Customer, Style, Persona } from '@prisma/client'
+import { Prisma, type Customer, type Style, type Persona } from '@prisma/client'
 import type { 
     CreateCustomer as CreateCustomerOperation,
     UpdateCustomer as UpdateCustomerOperation,
@@ -294,22 +294,41 @@ export const updateCustomerSubscription:
   });
 
   if (!customer) {
-    throw new HttpError(404, "Customer not found or you do not have permission to update it.");
+    throw new HttpError(404, "Customer not found or access denied.");
   }
 
-  // TODO: Validate planId against a list of known valid plan IDs if needed.
-  // For now, we assume planId is valid.
+  const oldPlanId = customer.subscriptionPlan; // Store the old plan
 
+  // Update the subscription plan
   const updatedCustomer = await context.entities.Customer.update({
     where: {
       id: customerId,
     },
     data: {
       subscriptionPlan: planId,
-      subscriptionStatus: "active", // For now, any plan change makes it active. Could be more nuanced.
+      // Potentially update subscriptionStatus if your logic requires it (e.g., 'active')
+      subscriptionStatus: 'active', 
     },
-    // No include needed if we only return the CustomerEntity from Prisma update
   });
+
+  // If downgraded from premium, clear LinkedIn data
+  if (oldPlanId === 'premium_tier' && planId !== 'premium_tier') {
+    console.log(`Customer ${customerId} downgraded from premium. Clearing LinkedIn data.`);
+    await context.entities.Customer.update({
+      where: { id: customerId },
+      data: {
+        linkedinUserId: null,
+        linkedinAccessToken: null,
+        linkedinAccessTokenExpiresAt: null,
+        linkedinRefreshToken: null,
+        linkedinGrantedScopes: [],
+        linkedinProfileData: Prisma.DbNull, // Use Prisma.DbNull for JSON fields
+      },
+    });
+  }
 
   return updatedCustomer;
 }; 
+
+// --- LinkedIn Specific Operations (Placeholder - to be moved/integrated properly) ---
+// ... existing code ... 

@@ -13,7 +13,7 @@ import { getPlanById, CustomerPlan } from '../customers/plans'; // Import plan d
 import { prisma } from 'wasp/server'; // Import global Prisma Client instance
 
 // --- Types --- 
-type CustomerSelection = Pick<Customer, 'id' | 'name'>;
+// type CustomerSelection = Pick<Customer, 'id' | 'name'>; // Old type, not used by the query itself but for context
 
 // Structure expected from AI inside the 'comments' array
 interface AICommentData {
@@ -50,13 +50,13 @@ if (process.env.OPENAI_API_KEY) {
 }
 
 // --- Query --- 
-export const getAllCustomersForSelection: GetAllCustomersForSelection<void, Pick<Customer, 'id' | 'name'>[]> = async (_args, context) => {
+export const getAllCustomersForSelection: GetAllCustomersForSelection<void, Pick<Customer, 'id' | 'name' | 'subscriptionPlan'>[]> = async (_args, context) => {
     if (!context.user) {
         throw new HttpError(401);
     }
     return context.entities.Customer.findMany({
         where: { userId: context.user.id },
-        select: { id: true, name: true },
+        select: { id: true, name: true, subscriptionPlan: true },
         orderBy: { name: 'asc' },
     });
 };

@@ -141,27 +141,37 @@ const ArchivePage: React.FC = () => {
               {archivedPosts.map((post) => {
                 let releaseIcon;
                 let releaseTitle = 'Not Scheduled';
-                const now = new Date(); // Get current time once for comparison
+                const now = new Date();
 
-                if (post.schedule) {
+                if (post.linkedInPostUgcId) {
+                  // Primary condition: UGC ID exists, so it's published on LinkedIn
+                  releaseIcon = <FaCheckCircle className="text-green-500 h-5 w-5" />;
+                  releaseTitle = 'Published on LinkedIn';
+                  // Optionally, if schedule data is available and reliable, add posting date to title
+                  if (post.schedule && post.schedule.isPosted) {
+                    const postingDate = new Date(post.schedule.postingDate);
+                    releaseTitle = `Published on LinkedIn (around ${postingDate.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})})`;
+                  }
+                } else if (post.schedule) {
+                  // No UGC ID, but a schedule exists
                   const postingDate = new Date(post.schedule.postingDate);
-                  if (postingDate < now) { // Posting date has passed
-                    releaseIcon = <FaCheckCircle className="text-green-500 h-5 w-5" />;
-                    if (post.schedule.isPosted) {
-                      releaseTitle = `Posted on ${postingDate.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}`;
-                    } else {
-                      releaseTitle = `Posting date ${postingDate.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} passed`;
-                    }
-                  } else { // Posting date is in the future
+                  if (postingDate < now) {
+                    // Scheduled date has passed, but not confirmed as posted (no UGC ID)
+                    // This could be considered pending or potentially failed.
+                    releaseIcon = <FaTimesCircle className="text-orange-500 h-5 w-5" />; // Orange for pending/issue
+                    releaseTitle = `Scheduled posting date ${postingDate.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} passed, not confirmed on LinkedIn`;
+                  } else {
+                    // Scheduled for the future
                     releaseIcon = <FaHourglassHalf className="text-yellow-500 h-5 w-5" />;
                     releaseTitle = `Scheduled for ${postingDate.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}`;
                   }
-                } else { // Not scheduled
+                } else {
+                  // No UGC ID and no schedule
                   releaseIcon = <FaTimesCircle className="text-gray-400 h-5 w-5" />;
-                  // releaseTitle remains 'Not Scheduled' from initialization
+                  releaseTitle = 'Not Scheduled / Not Published';
                 }
 
-                const canSchedule = !post.schedule?.isPosted;
+                const canSchedule = !post.schedule?.isPosted && !post.linkedInPostUgcId; // Cannot schedule if already posted via UGC ID
                 let scheduleButtonTitle = "Schedule Post";
                 if (post.schedule && !post.schedule.isPosted) {
                     scheduleButtonTitle = "Edit Schedule";

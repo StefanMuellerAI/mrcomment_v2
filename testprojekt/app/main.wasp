@@ -93,6 +93,9 @@ app OpenSaaS {
       email: "donotreply@mrcomment.de"
     },
   },
+  server: {
+    envValidationSchema: import { serverEnvValidationSchema } from "@src/env.ts",
+  }
 }
 
 route LandingPageRoute { path: "/", to: LandingPage }
@@ -407,7 +410,13 @@ action generateLinkedInPostWithAI {
   fn: import { generateLinkedInPostWithAI } from "@src/posts/operations.js",
   entities: [User, Customer, SystemSettings]
 }
-// -- LinkedIn Post Actions --
+
+// ++ Neue Action für Speichern und sofortiges Veröffentlichen ++
+action saveAndPublishLinkedInPost {
+  fn: import { saveAndPublishLinkedInPost } from "@src/posts/operations.js",
+  entities: [User, Customer, LinkedInPost, Schedule] // Post entfernt, Schedule beibehalten für den Moment
+}
+// -- Neue Action für Speichern und sofortiges Veröffentlichen --
 
 // ++ Archive Page Query ++
 query getAllLinkedInPostsForUser {
@@ -535,6 +544,53 @@ job markPostsAsPosted {
     // Run every minute to ensure timely updates
     cron: "* * * * *"
   },
-  entities: [Schedule, LinkedInPost] // LinkedInPost might not be strictly needed if not directly used in job logic after linking
+  entities: [Schedule, LinkedInPost, Customer] // Customer hinzugefügt
 }
 //#endregion
+
+// ++ LinkedIn Customer Integration ++
+action initiateLinkedInAuthForCustomer {
+  fn: import { initiateLinkedInAuthForCustomer } from "@src/server/linkedinIntegration.ts",
+  entities: [User, Customer, LinkedInAuthState]
+}
+
+api linkedinCustomerCallback {
+  fn: import { handleLinkedInCustomerCallback } from "@src/server/linkedinIntegration.ts",
+  httpRoute: (GET, "/api/auth/linkedin/customer/callback"),
+  auth: false,
+  entities: [Customer, LinkedInAuthState]
+}
+
+query getLinkedInConnectionStatusForCustomer {
+  fn: import { getLinkedInConnectionStatusForCustomer } from "@src/server/linkedinIntegration.ts",
+  entities: [User, Customer]
+}
+
+action disconnectLinkedInForCustomer {
+  fn: import { disconnectLinkedInForCustomer } from "@src/server/linkedinIntegration.ts",
+  entities: [User, Customer]
+}
+// -- LinkedIn Customer Integration --
+
+// ++ Test Operation ++
+query getMyTest {
+  fn: import { myTestQuery } from "@src/server/testOp.ts",
+  entities: []
+}
+// -- Test Operation --
+
+api testCallbackRoute {
+  fn: import { simpleTestCallback } from "@src/server/linkedinIntegration.ts",
+  httpRoute: (GET, "/test-simple-callback"),
+  auth: false
+}
+
+action getPresignedUrlForPostImage {
+  fn: import { getPresignedUrlForPostImage } from "@src/posts/operations.js",
+  entities: [User, File]
+}
+
+query getPostImageDownloadUrl {
+  fn: import { getPostImageDownloadUrl } from "@src/posts/operations",
+  entities: [User] 
+}

@@ -1,11 +1,18 @@
 import { HttpError } from 'wasp/server';
 import type { LinkedInPost, Customer, SystemSettings } from 'wasp/entities';
-import type { CreateLinkedInPost, UpdateLinkedInPost, GetLinkedInPostsByCustomer, GetLinkedInPostById, DeleteLinkedInPost, GenerateLinkedInPostWithAI } from 'wasp/server/operations';
+import type { CreateLinkedInPost, UpdateLinkedInPost, GetLinkedInPostsByCustomer, GetLinkedInPostById, DeleteLinkedInPost, GenerateLinkedInPostWithAI, SaveAndPublishLinkedInPost, GetPresignedUrlForPostImage, GetPostImageDownloadUrl } from 'wasp/server/operations';
 import { z } from 'zod';
 import { ensureArgsSchemaOrThrowHttpError } from '../server/validation';
-import { getPlanById, CustomerPlan } from '../customers/plans'; // Import plan definitions
+import { getPlanById, type CustomerPlan as CustomerPlanInterface } from '../customers/plans'; // Import plan definitions and interface
 import { getSystemSettings } from '../admin/settingsOperations'; // To get the system prompt
 import OpenAI from 'openai';
+import { publishPostToLinkedIn } from '../server/linkedinIntegration'; // Import publishPostToLinkedIn
+import { prisma as prismaClient } from 'wasp/server'; // Import prisma client directly
+import type { PrismaClient } from '@prisma/client'; // Import PrismaClient for type safety
+import { v4 as uuidv4 } from 'uuid'; // For generating unique file names
+import { generatePresignedPostForImage } from './s3PostImageUtils'; // Import new S3 utility
+import { getDownloadFileSignedURLFromS3 } from '../file-upload/s3Utils';
+import type { AuthUser } from 'wasp/auth'; // Import AuthUser for the context interface
 
 // Define the Zod schema for input validation
 const createLinkedInPostInputSchema = z.object({
@@ -13,6 +20,8 @@ const createLinkedInPostInputSchema = z.object({
   hook: z.string().min(1, 'Hook cannot be empty.'), // Add min lengths or other constraints as needed
   content: z.string().min(1, 'Content cannot be empty.'),
   cta: z.string().min(1, 'CTA cannot be empty.'),
+  imageS3Key: z.string().optional().nullable(),
+  imageContentType: z.string().optional().nullable(),
 });
 
 // Define the expected input type for the Wasp action based on the schema
@@ -21,6 +30,8 @@ interface CreateLinkedInPostInput {
   hook: string;
   content: string;
   cta: string;
+  imageS3Key?: string | null;
+  imageContentType?: string | null;
 }
 
 // This interface can remain for internal clarity if desired, or be removed if Zod type is used directly.
@@ -29,6 +40,8 @@ interface CreateLinkedInPostInputInternal {
   hook: string;
   content: string;
   cta: string;
+  imageS3Key?: string | null;
+  imageContentType?: string | null;
 }
 
 // Define the Zod schema for UpdateLinkedInPost input
@@ -37,6 +50,8 @@ const updateLinkedInPostInputSchema = z.object({
   hook: z.string().optional(), // Fields are optional for update
   content: z.string().optional(),
   cta: z.string().optional(),
+  imageS3Key: z.string().optional().nullable(),
+  imageContentType: z.string().optional().nullable(),
 });
 
 // Define the expected input type for the UpdateLinkedInPost action
@@ -45,6 +60,8 @@ interface UpdateLinkedInPostInput {
   hook?: string;
   content?: string;
   cta?: string;
+  imageS3Key?: string | null;
+  imageContentType?: string | null;
 }
 
 // --- Query Schema and Interface for GetLinkedInPostsByCustomer ---
@@ -75,10 +92,16 @@ interface DeleteLinkedInPostInputInternal {
 const generateLinkedInPostWithAIInputSchema = z.object({
   customerId: z.string().min(1, "Customer ID is required."),
   topic: z.string().min(10, "Topic must be at least 10 characters long."),
+  aiInputType: z.enum(['text', 'pdf', 'url']),
+  aiTextPrompt: z.string().max(3000).optional(),
+  aiUrlInput: z.string().url().optional(),
 });
 interface GenerateLinkedInPostWithAIInput {
   customerId: string;
   topic: string;
+  aiInputType: 'text' | 'pdf' | 'url';
+  aiTextPrompt?: string;
+  aiUrlInput?: string;
 }
 
 // Expected output structure from AI
@@ -106,7 +129,7 @@ export const createLinkedInPost: CreateLinkedInPost<any, LinkedInPost> = async (
   // Validate the raw `args` using the Zod schema. 
   // The type of validatedArgs will be inferred from the schema.
   const validatedArgs = ensureArgsSchemaOrThrowHttpError(createLinkedInPostInputSchema, args);
-  const { customerId, hook, content, cta } = validatedArgs; // These are now correctly typed from Zod
+  const { customerId, hook, content, cta, imageS3Key, imageContentType } = validatedArgs; // These are now correctly typed from Zod
 
   // Verify that the customer belongs to the logged-in user
   const customer = await context.entities.Customer.findFirst({
@@ -145,6 +168,8 @@ export const createLinkedInPost: CreateLinkedInPost<any, LinkedInPost> = async (
       cta,
       customerId: customer.id, // or just customerId from validatedArgs
       userId: context.user.id,
+      imageS3Key: imageS3Key,
+      imageContentType: imageContentType,
     },
   });
 
@@ -158,7 +183,7 @@ export const updateLinkedInPost: UpdateLinkedInPost<any, LinkedInPost> = async (
   }
 
   const validatedArgs = ensureArgsSchemaOrThrowHttpError(updateLinkedInPostInputSchema, args);
-  const { postId, hook, content, cta } = validatedArgs;
+  const { postId, hook, content, cta, imageS3Key, imageContentType } = validatedArgs;
 
   // Verify the post exists and belongs to the current user
   const existingPost = await context.entities.LinkedInPost.findFirst({
@@ -173,10 +198,18 @@ export const updateLinkedInPost: UpdateLinkedInPost<any, LinkedInPost> = async (
   }
 
   // Prepare data for update (only include fields that are actually provided)
-  const dataToUpdate: { hook?: string; content?: string; cta?: string } = {};
+  const dataToUpdate: { 
+    hook?: string; 
+    content?: string; 
+    cta?: string; 
+    imageS3Key?: string | null; 
+    imageContentType?: string | null 
+  } = {};
   if (hook !== undefined) dataToUpdate.hook = hook;
   if (content !== undefined) dataToUpdate.content = content;
   if (cta !== undefined) dataToUpdate.cta = cta;
+  if (imageS3Key !== undefined) dataToUpdate.imageS3Key = imageS3Key;
+  if (imageContentType !== undefined) dataToUpdate.imageContentType = imageContentType;
 
   // Prevent update if no data is being changed (optional, but good practice)
   if (Object.keys(dataToUpdate).length === 0) {
@@ -294,7 +327,7 @@ export const generateLinkedInPostWithAI: GenerateLinkedInPostWithAI<any, any> = 
   if (!context.user) { throw new HttpError(401, 'User is not authenticated'); }
   if (!openai) { throw new HttpError(503, 'OpenAI client not initialized. Check API Key.'); }
   const validatedArgs = ensureArgsSchemaOrThrowHttpError(generateLinkedInPostWithAIInputSchema, args);
-  const { customerId, topic } = validatedArgs;
+  const { customerId, topic, aiInputType, aiTextPrompt, aiUrlInput } = validatedArgs;
   const customer = await context.entities.Customer.findFirst({ where: { id: customerId, userId: context.user.id }, include: { style: true }, });
   if (!customer) { throw new HttpError(404, 'Customer not found or access denied.'); }
   const styleAnalysis = customer.style?.styleAnalysis || 'A general professional and engaging writing style.';
@@ -355,6 +388,215 @@ export const generateLinkedInPostWithAI: GenerateLinkedInPostWithAI<any, any> = 
     } else { console.error(error.message); }
     if (error instanceof HttpError) throw error;
     throw new HttpError(502, `Failed to generate post with AI: ${error.message || 'Unknown OpenAI error'}`);
+  }
+};
+
+// --- Zod Schema and Interface for GetPresignedUrlForPostImage ---
+const getPresignedUrlForPostImageInputSchema = z.object({
+  fileName: z.string().min(1, 'File name is required.'),
+  fileType: z.string().min(1, 'File type is required.'),
+  customerId: z.string().min(1, 'Customer ID is required.'),
+});
+
+interface GetPresignedUrlForPostImageValidatedArgs {
+  fileName: string;
+  fileType: string;
+  customerId: string;
+}
+
+// Return type updated for presigned POST
+export const getPresignedUrlForPostImage: GetPresignedUrlForPostImage<
+  any, 
+  { uploadUrl: string; fields: Record<string, string>; fileKey: string }
+> = async (args, context) => {
+  if (!context.user) {
+    throw new HttpError(401, 'User is not authenticated');
+  }
+
+  const validatedArgs = ensureArgsSchemaOrThrowHttpError(getPresignedUrlForPostImageInputSchema, args) as GetPresignedUrlForPostImageValidatedArgs;
+  const { fileName, fileType, customerId } = validatedArgs;
+
+  const customer = await prismaClient.customer.findFirst({
+    where: { id: customerId, userId: context.user.id },
+    select: { subscriptionPlan: true },
+  });
+
+  if (!customer) {
+    throw new HttpError(404, 'Customer not found or access denied.');
+  }
+  
+  if (customer.subscriptionPlan !== 'premium_tier') {
+    throw new HttpError(403, 'Image uploads are only available for premium_tier customers.');
+  }
+
+  try {
+    // Use the new S3 utility instead of context.s3
+    const { uploadUrl, key: generatedFileKey, uploadFields } = await generatePresignedPostForImage({
+      fileName,
+      fileType,
+      customerId,
+      userId: context.user.id, // Pass userId, s3PostImageUtils expects it
+    });
+    return { uploadUrl, fields: uploadFields, fileKey: generatedFileKey };
+  } catch (error: any) {
+    console.error('Error generating presigned POST URL for image:', error);
+    throw new HttpError(500, `Failed to generate upload URL for image: ${error.message}`);
+  }
+};
+
+// --- Zod Schema and Interface for SaveAndPublishLinkedInPost ---
+const saveAndPublishLinkedInPostInputSchema = z.object({
+  postId: z.string().optional().nullable(),
+  customerId: z.string().min(1, 'Customer ID is required.'),
+  hook: z.string().min(1, 'Hook is required.'),
+  content: z.string().min(1, 'Content is required.'),
+  cta: z.string().min(1, 'CTA is required.'),
+  imageS3Key: z.string().optional().nullable(),
+  imageContentType: z.string().optional().nullable(),
+});
+
+interface SaveAndPublishLinkedInPostValidatedArgs {
+  postId?: string | null;
+  customerId: string;
+  hook: string;
+  content: string;
+  cta: string;
+  imageS3Key?: string | null;
+  imageContentType?: string | null;
+}
+
+// DUPLICATED Interface from linkedinIntegration.ts for now
+// Standard Wasp Action context (simplified view relevant for this function)
+interface WaspActionContext {
+  user: AuthUser;       
+  prisma: PrismaClient; 
+}
+
+// Action to save a post and then publish it to LinkedIn
+export const saveAndPublishLinkedInPost: SaveAndPublishLinkedInPost<any, LinkedInPost> = async (
+  args, 
+  context // context here is the standard Wasp Action context, primarily for context.user
+) => {
+  if (!context.user) { 
+    throw new HttpError(401, 'User is not authenticated');
+  }
+
+  const validatedArgs = ensureArgsSchemaOrThrowHttpError(saveAndPublishLinkedInPostInputSchema, args) as SaveAndPublishLinkedInPostValidatedArgs;
+  const { postId, customerId, hook, content, cta, imageS3Key, imageContentType } = validatedArgs;
+
+  // Use the imported prismaClient for DB operations
+  const customer = await prismaClient.customer.findFirst({
+    where: { id: customerId, userId: context.user.id },
+    select: { id: true, subscriptionPlan: true, linkedinUserId: true }, 
+  });
+
+  if (!customer) {
+    throw new HttpError(404, 'Customer not found or access denied.');
+  }
+
+  const planDetails = getPlanById(customer.subscriptionPlan);
+  if (planDetails?.id !== 'premium_tier') {
+    throw new HttpError(403, 'Publishing LinkedIn posts is a premium feature.');
+  }
+
+  let postToPublish: LinkedInPost;
+
+  if (postId) {
+    // Update existing post draft before publishing
+    const existingPost = await prismaClient.linkedInPost.findFirst({
+      where: { id: postId, userId: context.user.id }
+    });
+    if (!existingPost) {
+      throw new HttpError(404, `Post with ID ${postId} not found or access denied.`);
+    }
+    // Check post limit only if it's effectively a new post being saved to this customer beyond what was there.
+    // If we are just updating an existing one, the limit was checked at its creation.
+    // However, to be safe, or if posts can be moved between customers (not the case here), re-checking might be desired.
+    // For now, assume updating an existing post doesn't count against the limit again if it simply changes content.
+
+    postToPublish = await prismaClient.linkedInPost.update({
+      where: { id: postId }, // Ensure this is the ID of the existing post
+      data: {
+        hook,
+        content,
+        cta,
+        // customerId and userId should not change for an existing post typically
+        imageS3Key: imageS3Key, // Update image if new one was provided
+        imageContentType: imageContentType, // Update content type
+        // Ensure other fields like linkedInPostUgcId are NOT reset here accidentally
+      },
+    });
+    console.log(`[SaveAndPublish] Updated existing post ${postId} before publishing.`);
+
+  } else {
+    // Create new post
+    const maxPosts = planDetails?.maxPostsPerCustomer ?? 0;
+    const currentPostCount = await prismaClient.linkedInPost.count({
+      where: { customerId: customerId },
+    });
+    if (currentPostCount >= maxPosts) {
+      throw new HttpError(403, `Maximum post storage limit of ${maxPosts} reached.`);
+    }
+    postToPublish = await prismaClient.linkedInPost.create({
+      data: {
+        hook, content, cta, customerId, userId: context.user.id, imageS3Key, imageContentType,
+      },
+    });
+    console.log(`[SaveAndPublish] Created new post ${postToPublish.id} before publishing.`);
+  }
+
+  if (!customer.linkedinUserId) {
+    console.warn(`Customer ${customerId} has no LinkedIn User ID. Post ${postToPublish.id} saved/updated but will not be published.`);
+    return postToPublish; 
+  }
+
+  try {
+    const contextForPublish: WaspActionContext = {
+        user: context.user, 
+        prisma: prismaClient, 
+    };
+    await publishPostToLinkedIn(
+        { linkedInPostIdDb: postToPublish.id }, 
+        contextForPublish
+    );
+    const publishedAndUpdatedPost = await prismaClient.linkedInPost.findUnique({ where: { id: postToPublish.id } });
+    if (!publishedAndUpdatedPost) {
+        throw new HttpError(500, `Post ${postToPublish.id} was published but could not be refetched with UGC ID.`);
+    }
+    return publishedAndUpdatedPost;
+  } catch (publishError: any) {
+    console.error(`[SaveAndPublish] Error during LinkedIn publishing for post ${postToPublish.id}:`, publishError.message);
+    if (publishError instanceof HttpError) {
+        throw new HttpError(publishError.statusCode, `Post ${postToPublish.id} saved/updated, but publishing failed: ${publishError.message}`);
+    }
+    throw new HttpError(500, `Post ${postToPublish.id} saved/updated, but an unexpected error occurred during publishing: ${publishError.message}`);
+  }
+};
+
+// Query to get a download URL for an S3 object (e.g., post image)
+// Make sure to declare this query (getPostImageDownloadUrl) in main.wasp
+// and import its type from 'wasp/server/operations' if needed for strong typing elsewhere,
+// though for the implementation itself, this signature is key.
+export const getPostImageDownloadUrl: GetPostImageDownloadUrl<
+  { s3Key: string }, 
+  string 
+> = async (args, context) => {
+  if (!context.user) { // Auth Check
+    throw new HttpError(401, "User is not authenticated.");
+  }
+  
+  const { s3Key } = args;
+
+  if (!s3Key) {
+    throw new HttpError(400, "S3 key is required to generate a download URL.");
+  }
+
+  try {
+    const downloadUrl = await getDownloadFileSignedURLFromS3({ key: s3Key });
+    return downloadUrl;
+  } catch (error: any) {
+    console.error('Failed to generate download URL for post image:', error);
+    throw new HttpError(500, error.message || 'Failed to generate image download URL.');
   }
 };
 

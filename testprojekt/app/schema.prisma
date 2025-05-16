@@ -127,6 +127,14 @@ model Customer {
   subscriptionStatus String?
   dailyUsage         CustomerDailyUsage[]
   linkedInPosts      LinkedInPost[]
+
+  // Neue Felder für LinkedIn Integration
+  linkedinUserId              String?   // Eindeutige LinkedIn User ID (URN, z.B. "urn:li:person:xxxxxx")
+  linkedinAccessToken         String?   @db.Text // Access tokens can be long
+  linkedinAccessTokenExpiresAt DateTime? // Ablaufdatum des Access Tokens
+  linkedinRefreshToken        String?   @db.Text // Refresh tokens can be long
+  linkedinGrantedScopes       String[]  // Die vom Nutzer gewährten Scopes
+  linkedinProfileData         Json?     // Zum Speichern von Basis-Profildaten (Name, Bild-URL, etc.) für die Anzeige
 }
 
 model CustomerDailyUsage {
@@ -186,6 +194,9 @@ model LinkedInPost {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   schedule Schedule?
+  linkedInPostUgcId String? @unique // To store the URN of the post created on LinkedIn
+  imageS3Key        String?          // S3 key for the post image
+  imageContentType  String?          // MIME type of the post image
 }
 
 model Schedule {
@@ -201,4 +212,16 @@ model Schedule {
   updatedAt DateTime @updatedAt
 
   @@index([postingDate])
+}
+
+// Neues Modell zum Speichern des OAuth 'state' Parameters
+model LinkedInAuthState {
+  id                  String   @id @default(cuid())
+  state               String   @unique // Der zufällige State-String
+  customerId          String   // Die ID des Customers, für den die Auth initiiert wurde
+  initiatingWaspUserId String  // Die ID des Wasp-Users, der den Vorgang gestartet hat
+  createdAt           DateTime @default(now())
+  expiresAt           DateTime // Setze eine kurze Ablaufzeit (z.B. 10 Minuten)
+
+  @@index([expiresAt])
 }

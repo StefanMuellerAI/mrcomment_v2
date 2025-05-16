@@ -36,8 +36,16 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  // Helper function to get current time as HH:MM
+  const getCurrentTimeFormatted = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const [modalSelectedDate, setModalSelectedDate] = useState<string>('');
-  const [modalSelectedTime, setModalSelectedTime] = useState<string>('10:00');
+  const [modalSelectedTime, setModalSelectedTime] = useState<string>(getCurrentTimeFormatted()); // Use current time
   const [modalEnableReminder, setModalEnableReminder] = useState<boolean>(false);
   const [modalReminderMinutes, setModalReminderMinutes] = useState<number>(15);
   const [modalErrorState, setModalErrorState] = useState<string | null>(null);
@@ -80,7 +88,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
             // Default to today if scheduling an unscheduled post without calendar context
             setModalSelectedDate(today_YYYY_MM_DD);
           }
-          setModalSelectedTime('10:00');
+          setModalSelectedTime(getCurrentTimeFormatted()); // Use current time
           setModalEnableReminder(false);
           setModalReminderMinutes(15);
         }
@@ -90,7 +98,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         const month = (selectedDateFromCalendar.getMonth() + 1).toString().padStart(2, '0');
         const day = selectedDateFromCalendar.getDate().toString().padStart(2, '0');
         setModalSelectedDate(`${year}-${month}-${day}`);
-        setModalSelectedTime('10:00');
+        setModalSelectedTime(getCurrentTimeFormatted()); // Use current time
         setModalEnableReminder(false);
         setModalReminderMinutes(15);
         setModalCustomerIdState(globalSelectedCustomerId || '');
@@ -98,7 +106,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       } else {
         // Fallback: No context (should ideally not happen if modal is opened correctly)
         setModalSelectedDate(today_YYYY_MM_DD);
-        setModalSelectedTime('10:00');
+        setModalSelectedTime(getCurrentTimeFormatted()); // Use current time
         setModalEnableReminder(false);
         setModalReminderMinutes(15);
         setModalCustomerIdState(globalSelectedCustomerId || '');
