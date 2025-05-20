@@ -1,8 +1,8 @@
-# OpenSaas.sh
+# OpenSaaS.sh
 
-This is the https://opensaas.sh page and demo app, built with the Open Saas template!
+This is the https://opensaas.sh page and demo app, built with the Open SaaS template!
 
-It consists of a Wasp app for showcasing the Open Saas template (+ landing page), while the Astro blog is blog and docs for the Open Saas template, found at https://docs.opensaas.sh.
+It consists of a Wasp app for showcasing the Open SaaS template (+ landing page), while the Astro blog is blog and docs for the Open SaaS template, found at https://docs.opensaas.sh.
 
 Inception :)!
 
@@ -42,7 +42,7 @@ Make sure not to commit `app/` to git. It is currently (until we resolve this) n
 
 ### Blog (blog/)
 
-Blog (and docs in it) is currently tracked in whole, as it has quite some content, so updating it to the latest version of Open Saas is done manually, but it might be interesting to also move it to the `diff` approach, as we use for the demo app, if it turns out to be a good match.
+Blog (and docs in it) is currently tracked in whole, as it has quite some content, so updating it to the latest version of Open SaaS is done manually, but it might be interesting to also move it to the `diff` approach, as we use for the demo app, if it turns out to be a good match.
 
 For more info on authoring content for the docs and blog, including information on custom components, see the [blog/README.md](blog/README.md).
 
