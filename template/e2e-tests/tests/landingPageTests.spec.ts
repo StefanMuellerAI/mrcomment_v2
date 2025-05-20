@@ -1,4 +1,5 @@
-import { test, expect, Cookie } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import type { Cookie } from '@playwright/test';
 
 const DOCS_URL = 'https://docs.opensaas.sh';
 
@@ -35,7 +36,7 @@ test.describe('cookie consent tests', () => {
     context,
     page,
   }) => {
-    await page.$$('button:has-text("Reject all")');
+    await page.waitForSelector('button:has-text("Reject all")');
     await page.click('button:has-text("Reject all")');
 
     const cookies = await context.cookies();
@@ -48,7 +49,7 @@ test.describe('cookie consent tests', () => {
     context,
     page,
   }) => {
-    await page.$$('button:has-text("Accept all")');
+    await page.waitForSelector('button:has-text("Accept all")');
     await page.click('button:has-text("Accept all")');
 
     let cookies = await context.cookies();
