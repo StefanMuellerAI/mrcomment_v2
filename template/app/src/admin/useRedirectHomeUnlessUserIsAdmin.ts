@@ -9,5 +9,5 @@ export function useRedirectHomeUnlessUserIsAdmin({ user }: { user: AuthUser }) {
     if (!user.isAdmin) {
       navigate('/');
     }
-  }, [user, history]);
+  }, [user, navigate]);
 }
