@@ -82,7 +82,7 @@ export const generateGptResponse: GenerateGptResponse<GenerateGptResponseInput, 
   });
 
   console.log('Decrementing credits and saving response');
-  await prisma.$transaction([decrementCredit, createResponse]);
+  prisma.$transaction([decrementCredit, createResponse]);
 
   return generatedSchedule;
 };
